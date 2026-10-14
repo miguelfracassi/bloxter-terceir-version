@@ -1,9 +1,9 @@
 // Se algum módulo falhar ao carregar, devolvemos o erro em JSON (em vez da página de erro da Vercel).
-let bcrypt, getSql, ensureSchema, getUserId, setSession, clearSession, loadError;
+let bcrypt, getSql, ensureSchema, getUserId, setSession, clearSession, adminPassword, isAdmin, setAdmin, clearAdmin, loadError;
 try {
   bcrypt = require('bcryptjs');
   ({ getSql, ensureSchema } = require('../lib/db'));
-  ({ getUserId, setSession, clearSession } = require('../lib/auth'));
+  ({ getUserId, setSession, clearSession, adminPassword, isAdmin, setAdmin, clearAdmin } = require('../lib/auth'));
 } catch (e) {
   loadError = e;
 }
@@ -76,8 +76,13 @@ function meUser(r) {
     bio: r.bio,
     link: r.link,
     avatar: avatarUrl(r.id, r.avatar_v),
+    ...flags(r),
     created_at: r.created_at,
   };
+}
+
+function flags(r) {
+  return { verified: !!r.verified, is_ai: !!r.is_ai };
 }
 
 function isUnique(e) {
@@ -134,8 +139,73 @@ module.exports = async (req, res) => {
         username: r.username,
         name: r.name,
         avatar: avatarUrl(r.uid, r.avatar_v),
+        ...flags(r),
       },
     });
+
+    // ---------- ADMIN (/verificacao) ----------
+    if (a === 'admin') {
+      if (b === 'login' && method === 'POST') {
+        const pw = typeof readBody(req).password === 'string' ? readBody(req).password : '';
+        if (pw !== adminPassword()) {
+          await new Promise((r) => setTimeout(r, 600));
+          throw new HttpError(401, 'wrong_password');
+        }
+        setAdmin(res);
+        return send({ ok: true });
+      }
+      if (b === 'logout' && method === 'POST') {
+        clearAdmin(res);
+        return send({ ok: true });
+      }
+      if (!isAdmin(req)) throw new HttpError(401, 'unauthorized');
+      if (b === 'me' && method === 'GET') return send({ ok: true });
+
+      const adminUser = (r) => ({
+        id: r.id, username: r.username, name: r.name, avatar: avatarUrl(r.id, r.avatar_v),
+        ...flags(r), bonus: Number(r.bonus_followers), real: Number(r.real_count), followers: Number(r.real_count) + Number(r.bonus_followers),
+      });
+      if (b === 'users' && !c && method === 'GET') {
+        const term = cleanUsername(q.get('q')).slice(0, 50);
+        const like = `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+        const rows = await sql`
+          SELECT u.id, u.username, u.name, u.avatar_v, u.verified, u.is_ai, u.bonus_followers,
+            (SELECT count(*) FROM follows WHERE followee_id = u.id)::int AS real_count
+          FROM users u
+          WHERE ${term} = '' OR u.username ILIKE ${like} OR u.name ILIKE ${like}
+          ORDER BY u.id DESC LIMIT 40`;
+        return send({ users: rows.map(adminUser) });
+      }
+      if (b === 'users' && c && method === 'PATCH') {
+        const d = readBody(req);
+        const uname = cleanUsername(c);
+        const [cur] = await sql`SELECT * FROM users WHERE username = ${uname}`;
+        if (!cur) throw new HttpError(404, 'not_found');
+        let verified = cur.verified;
+        let isAi = cur.is_ai;
+        let bonus = Number(cur.bonus_followers);
+        if (typeof d.verified === 'boolean') verified = d.verified;
+        if (typeof d.is_ai === 'boolean') isAi = d.is_ai;
+        const clamp = (n) => Math.max(0, Math.min(1e12, n));
+        if (d.set_bonus !== undefined) {
+          const n = Math.floor(Number(d.set_bonus));
+          if (!Number.isFinite(n)) throw new HttpError(400, 'invalid_number');
+          bonus = clamp(n);
+        }
+        if (d.add_followers !== undefined) {
+          const n = Math.floor(Number(d.add_followers));
+          if (!Number.isFinite(n)) throw new HttpError(400, 'invalid_number');
+          bonus = clamp(bonus + n);
+        }
+        const [row] = await sql`
+          UPDATE users SET verified = ${verified}, is_ai = ${isAi}, bonus_followers = ${bonus}
+          WHERE id = ${cur.id}
+          RETURNING id, username, name, avatar_v, verified, is_ai, bonus_followers,
+            (SELECT count(*) FROM follows WHERE followee_id = users.id)::int AS real_count`;
+        return send({ user: adminUser(row) });
+      }
+      throw new HttpError(404, 'not_found');
+    }
 
     // ---------- AUTH ----------
     if (a === 'auth' && b === 'register' && method === 'POST') {
@@ -283,7 +353,7 @@ module.exports = async (req, res) => {
       const tab = q.get('tab') === 'following' ? 'following' : 'all';
       const before = parseInt(q.get('before'), 10) || null;
       const rows = await sql`
-        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v,
+        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v, u.verified, u.is_ai,
           (SELECT count(*) FROM likes l WHERE l.post_id = p.id)::int AS likes,
           EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${me}) AS liked
         FROM posts p JOIN users u ON u.id = p.user_id
@@ -301,7 +371,7 @@ module.exports = async (req, res) => {
       if (!body) throw new HttpError(400, 'post_empty');
       const [row] = await sql`INSERT INTO posts (user_id, body) VALUES (${me}, ${body}) RETURNING id`;
       const [r] = await sql`
-        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v,
+        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v, u.verified, u.is_ai,
           0 AS likes, false AS liked
         FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = ${row.id}`;
       return send({ post: mapPost(r) }, 201);
@@ -330,11 +400,12 @@ module.exports = async (req, res) => {
     if (a === 'users' && b && !c && method === 'GET') {
       const uname = cleanUsername(b);
       const [r] = await sql`
-        SELECT u.id, u.username, u.name, u.bio, u.link, u.avatar_v, u.created_at,
-          (SELECT count(*) FROM follows WHERE followee_id = u.id)::int AS followers,
+        SELECT u.id, u.username, u.name, u.bio, u.link, u.avatar_v, u.verified, u.is_ai, u.created_at,
+          ((SELECT count(*) FROM follows WHERE followee_id = u.id) + u.bonus_followers)::bigint AS followers,
           (SELECT count(*) FROM follows WHERE follower_id = u.id)::int AS following,
           (SELECT count(*) FROM posts WHERE user_id = u.id)::int AS posts,
-          EXISTS (SELECT 1 FROM follows WHERE follower_id = ${me} AND followee_id = u.id) AS is_following
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = ${me} AND followee_id = u.id) AS is_following,
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = u.id AND followee_id = ${me}) AS follows_me
         FROM users u WHERE u.username = ${uname}`;
       if (!r) throw new HttpError(404, 'not_found');
       return send({
@@ -346,7 +417,9 @@ module.exports = async (req, res) => {
           link: r.link,
           avatar: avatarUrl(r.id, r.avatar_v),
           created_at: r.created_at,
-          followers: r.followers,
+          followers: Number(r.followers),
+          ...flags(r),
+          follows_me: r.follows_me,
           following: r.following,
           posts: r.posts,
           is_following: r.is_following,
@@ -360,7 +433,7 @@ module.exports = async (req, res) => {
       const uname = cleanUsername(b);
       const before = parseInt(q.get('before'), 10) || null;
       const rows = await sql`
-        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v,
+        SELECT p.id, p.body, p.created_at, u.id AS uid, u.username, u.name, u.avatar_v, u.verified, u.is_ai,
           (SELECT count(*) FROM likes l WHERE l.post_id = p.id)::int AS likes,
           EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.user_id = ${me}) AS liked
         FROM posts p JOIN users u ON u.id = p.user_id
@@ -379,8 +452,8 @@ module.exports = async (req, res) => {
       if (!del.length) {
         await sql`INSERT INTO follows (follower_id, followee_id) VALUES (${me}, ${target.id}) ON CONFLICT DO NOTHING`;
       }
-      const [n] = await sql`SELECT count(*)::int AS n FROM follows WHERE followee_id = ${target.id}`;
-      return send({ following: !del.length, followers: n.n });
+      const [n] = await sql`SELECT ((SELECT count(*) FROM follows WHERE followee_id = ${target.id}) + (SELECT bonus_followers FROM users WHERE id = ${target.id}))::bigint AS n`;
+      return send({ following: !del.length, followers: Number(n.n) });
     }
 
     // ---------- BUSCA / SUGESTÕES ----------
@@ -390,15 +463,16 @@ module.exports = async (req, res) => {
       if (!term) return send({ users: [] });
       const like = `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
       const rows = await sql`
-        SELECT u.id, u.username, u.name, u.bio, u.avatar_v,
-          EXISTS (SELECT 1 FROM follows WHERE follower_id = ${me} AND followee_id = u.id) AS is_following
+        SELECT u.id, u.username, u.name, u.bio, u.avatar_v, u.verified, u.is_ai,
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = ${me} AND followee_id = u.id) AS is_following,
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = u.id AND followee_id = ${me}) AS follows_me
         FROM users u
         WHERE u.username ILIKE ${like} OR u.name ILIKE ${like}
         ORDER BY (u.username = ${term}) DESC, u.username ASC LIMIT 20`;
       return send({
         users: rows.map((r) => ({
           id: r.id, username: r.username, name: r.name, bio: r.bio,
-          avatar: avatarUrl(r.id, r.avatar_v), is_following: r.is_following, is_me: r.id === me,
+          avatar: avatarUrl(r.id, r.avatar_v), is_following: r.is_following, follows_me: r.follows_me, is_me: r.id === me, ...flags(r),
         })),
       });
     }
@@ -406,14 +480,15 @@ module.exports = async (req, res) => {
     if (a === 'suggestions' && method === 'GET') {
       need();
       const rows = await sql`
-        SELECT u.id, u.username, u.name, u.avatar_v,
-          (SELECT count(*) FROM follows WHERE followee_id = u.id)::int AS followers
+        SELECT u.id, u.username, u.name, u.avatar_v, u.verified, u.is_ai,
+          ((SELECT count(*) FROM follows WHERE followee_id = u.id) + u.bonus_followers)::bigint AS followers,
+          EXISTS (SELECT 1 FROM follows WHERE follower_id = u.id AND followee_id = ${me}) AS follows_me
         FROM users u
         WHERE u.id <> ${me} AND u.id NOT IN (SELECT followee_id FROM follows WHERE follower_id = ${me})
         ORDER BY followers DESC, u.id DESC LIMIT 5`;
       return send({
         users: rows.map((r) => ({
-          id: r.id, username: r.username, name: r.name, avatar: avatarUrl(r.id, r.avatar_v), is_following: false,
+          id: r.id, username: r.username, name: r.name, avatar: avatarUrl(r.id, r.avatar_v), is_following: false, follows_me: r.follows_me, ...flags(r),
         })),
       });
     }
@@ -433,14 +508,14 @@ module.exports = async (req, res) => {
           FROM messages WHERE sender_id = ${me} OR receiver_id = ${me}
         )
         SELECT DISTINCT ON (m.other) m.other, m.body, m.created_at, m.sender_id,
-          u.username, u.name, u.avatar_v,
+          u.username, u.name, u.avatar_v, u.verified, u.is_ai,
           (SELECT count(*) FROM messages x WHERE x.sender_id = m.other AND x.receiver_id = ${me} AND x.read_at IS NULL)::int AS unread
         FROM m JOIN users u ON u.id = m.other
         ORDER BY m.other, m.id DESC`;
       rows.sort((x, y) => new Date(y.created_at) - new Date(x.created_at));
       return send({
         conversations: rows.map((r) => ({
-          user: { id: r.other, username: r.username, name: r.name, avatar: avatarUrl(r.other, r.avatar_v) },
+          user: { id: r.other, username: r.username, name: r.name, avatar: avatarUrl(r.other, r.avatar_v), ...flags(r) },
           last: r.body,
           mine: r.sender_id === me,
           created_at: r.created_at,
@@ -451,7 +526,7 @@ module.exports = async (req, res) => {
 
     if (a === 'messages' && b && method === 'GET') {
       need();
-      const [other] = await sql`SELECT id, username, name, avatar_v FROM users WHERE username = ${cleanUsername(b)}`;
+      const [other] = await sql`SELECT id, username, name, avatar_v, verified, is_ai FROM users WHERE username = ${cleanUsername(b)}`;
       if (!other) throw new HttpError(404, 'not_found');
       const after = parseInt(q.get('after'), 10) || 0;
       let rows;
@@ -470,7 +545,7 @@ module.exports = async (req, res) => {
       }
       await sql`UPDATE messages SET read_at = now() WHERE sender_id = ${other.id} AND receiver_id = ${me} AND read_at IS NULL`;
       return send({
-        user: { id: other.id, username: other.username, name: other.name, avatar: avatarUrl(other.id, other.avatar_v) },
+        user: { id: other.id, username: other.username, name: other.name, avatar: avatarUrl(other.id, other.avatar_v), ...flags(other) },
         messages: rows.map((r) => ({ id: r.id, mine: r.sender_id === me, body: r.body, created_at: r.created_at })),
       });
     }
