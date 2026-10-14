@@ -42,4 +42,31 @@ function clearSession(res) {
   res.setHeader('Set-Cookie', `${COOKIE}=; ${cookieFlags()}Max-Age=0`);
 }
 
-module.exports = { getUserId, setSession, clearSession };
+// ---------- sessão de admin (/verificacao) ----------
+const ADMIN_COOKIE = 'bx_admin';
+const ADMIN_AGE = 60 * 60 * 12; // 12 horas
+
+function adminPassword() {
+  return String(process.env.ADMIN_PASSWORD || '2015');
+}
+
+function isAdmin(req) {
+  const token = parseCookies(req)[ADMIN_COOKIE];
+  if (!token) return false;
+  try {
+    return jwt.verify(token, secret()).admin === true;
+  } catch {
+    return false;
+  }
+}
+
+function setAdmin(res) {
+  const token = jwt.sign({ admin: true }, secret(), { expiresIn: ADMIN_AGE });
+  res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=${token}; ${cookieFlags()}Max-Age=${ADMIN_AGE}`);
+}
+
+function clearAdmin(res) {
+  res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=; ${cookieFlags()}Max-Age=0`);
+}
+
+module.exports = { getUserId, setSession, clearSession, adminPassword, isAdmin, setAdmin, clearAdmin };
