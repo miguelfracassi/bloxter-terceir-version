@@ -9,13 +9,15 @@
     const pt = {
       invalid_email:'Digite um e-mail válido.',
       email_taken:'Este e-mail já tem uma conta.',
-      username_taken:'Esse nome de usuário já está ocupado.', invalid_username:'Use de 3 a 20 letras, números ou _.', name_required:'Digite seu nome.', weak_password:'A senha precisa ter pelo menos 8 caracteres.',
-      site_closed:'O site será inaugurado em 25/10 às 20:00.', server:'Algo deu errado. Tente novamente.', config_db:'Banco de dados não configurado.', config_jwt:'Sessão do servidor não configurada.'
+      username_taken:'Esse nome de usuário já está ocupado ou reservado. Escolha outro.', invalid_username:'Use de 3 a 20 letras, números ou _.', name_required:'Digite seu nome.', weak_password:'A senha precisa ter pelo menos 8 caracteres.',
+      site_closed:'O site será inaugurado em 25/10 às 20:00.', server:'O servidor não conseguiu criar a conta. Confira a configuração da API e do banco de dados.', network:'Não foi possível conectar ao servidor. Confira sua conexão e tente novamente.', config_db:'Banco de dados não configurado.', config_jwt:'Sessão do servidor não configurada.'
     };
     return pt[code] || 'Não foi possível continuar. Tente novamente.';
   }
   async function api(path, method='GET', body) {
-    const res=await fetch(`/api/${path}`,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
+    let res;
+    try { res=await fetch(`/api/${path}`,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'}); }
+    catch { const e=new Error('network');e.code='network';throw e; }
     const data=await res.json().catch(()=>({}));
     if(!res.ok){const e=new Error(data.error||'server');e.code=data.error;e.status=res.status;throw e;} return data;
   }
@@ -29,8 +31,6 @@
     e.preventDefault();message('#account-error');const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
     const name=$('#name').value.trim(), username=$('#username').value.trim().replace(/^@/,'').toLowerCase(), email=$('#email').value.trim().toLowerCase(), password=$('#password').value;
     try{
-      const availability=await api(`username-available?u=${encodeURIComponent(username)}`);
-      if(!availability.available)throw Object.assign(new Error(),{code:availability.reason||'username_taken'});
       await api('auth/register','POST',{name,username,email,password});
       account={name,username,email,password};
       $('#credential-preview').innerHTML=`<small>SEU USUÁRIO</small><strong>@${escapeHtml(username)}</strong><small>E-MAIL</small><strong>${escapeHtml(email)}</strong><small>SENHA</small><strong>${escapeHtml(password)}</strong>`;
