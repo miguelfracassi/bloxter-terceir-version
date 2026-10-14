@@ -19,7 +19,7 @@
     let linkHost = '';
     if (user.link) { try { linkHost = new URL(user.link).host.replace(/^www\./, ''); } catch { linkHost = user.link; } }
     v.innerHTML = `
-      <div class="page-head"><h1>${esc(user.name)}<small><span id="c-posts">${user.posts}</span> ${t('posts')}</small></h1></div>
+      <div class="page-head"><h1>${esc(user.name)}${BX.badges(user)}<small><span id="c-posts">${user.posts}</span> ${t('posts')}</small></h1></div>
       <div class="profile-top">
         <div class="profile-band"></div>
         <div class="profile-row">
@@ -28,10 +28,10 @@
             ${user.is_me
               ? `<a class="btn ghost sm" href="/settings">${t('editProfile')}</a>`
               : `<a class="btn ghost sm" href="/messages/${encodeURIComponent(user.username)}">${t('message')}</a>
-                 <button class="btn sm ${user.is_following ? 'ghost' : ''}" data-act="follow" data-user="${esc(user.username)}" data-profile="1">${user.is_following ? t('unfollow') : t('follow')}</button>`}
+                 <button class="btn sm ${user.is_following ? 'ghost' : ''}" data-act="follow" data-user="${esc(user.username)}" data-profile="1" data-fm="${user.follows_me ? 1 : ''}">${BX.followLabel(user)}</button>`}
           </div>
         </div>
-        <h2>${esc(user.name)}</h2>
+        <h2>${esc(user.name)}${BX.badges(user)}</h2>
         <div class="handle">@${esc(user.username)}</div>
         ${user.bio ? `<div class="bio">${fmt(user.bio)}</div>` : ''}
         <div class="meta">
@@ -39,7 +39,7 @@
           <span>${t('joined', { date: esc(joined) })}</span>
         </div>
         <div class="counts">
-          <span><b id="c-followers">${user.followers}</b> ${t('followers')}</span>
+          <span><b id="c-followers">${Number(user.followers).toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'en-US')}</b> ${t('followers')}</span>
           <span><b>${user.following}</b> ${t('followingLbl')}</span>
         </div>
       </div>
