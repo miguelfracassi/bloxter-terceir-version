@@ -1,0 +1,58 @@
+# Bloxter
+
+A rede social feita para quem vive o roleplay. Preto e branco, fonte Poppins, tema claro/escuro e português/inglês.
+
+## O que tem
+
+- Landing, **login** e **cadastro** (nome, nome de usuário, e-mail e senha)
+- Nome de usuário **único** (sem diferenciar maiúsculas) com checagem ao vivo
+- Feed estilo Twitter (aba "Para você" e "Seguindo"), posts de até 500 caracteres, curtidas
+- Perfil em `/account/usuario`: foto, nome, @usuário, bio e link na bio
+- Seguir / deixar de seguir, busca de pessoas, mensagens diretas
+- Idioma PT/EN e tema claro/escuro (salvos no navegador)
+
+## Páginas (cada uma é um arquivo HTML separado)
+
+| URL | Arquivo | Script |
+| --- | --- | --- |
+| `/` | `public/index.html` | `js/landing.js` |
+| `/login` | `public/login.html` | `js/login.js` |
+| `/signup` | `public/signup.html` | `js/signup.js` |
+| `/home` | `public/home.html` | `js/home.js` |
+| `/account/usuario` | `public/profile.html` | `js/profile.js` |
+| `/search` | `public/search.html` | `js/search.js` |
+| `/messages` | `public/messages.html` | `js/messages.js` |
+| `/messages/usuario` | `public/chat.html` | `js/chat.js` |
+| `/settings` | `public/settings.html` | `js/settings.js` |
+| qualquer outra | `public/404.html` | `js/notfound.js` |
+
+## Como colocar no ar (Vercel + Neon)
+
+1. Suba esta pasta para um repositório no GitHub e importe na Vercel.
+2. Na Vercel: **Storage → Create → Neon** e conecte ao projeto (isso cria a variável `DATABASE_URL`).
+3. Em **Settings → Environment Variables**, crie `JWT_SECRET` (veja `.env.example`).
+4. Faça o deploy. As tabelas são criadas sozinhas na primeira requisição (o `schema.sql` é só referência).
+
+Testar local: `npm i -g vercel`, `npm install`, copie `.env.example` para `.env.local` e rode `vercel dev`.
+
+## Estrutura
+
+```
+api/[...path].js   API inteira (uma função só)
+lib/db.js          Neon + criação das tabelas
+lib/auth.js        sessão por cookie (JWT, HttpOnly)
+public/*.html      uma página por arquivo
+public/js/common.js  código compartilhado (idioma, tema, API, menu, posts)
+public/js/<pagina>.js  código de cada página
+public/style.css   estilos
+vercel.json        URLs limpas (/login em vez de /login.html) e rotas com parâmetro
+```
+
+## Administração e apelações
+
+- `/administracao` abre a área restrita (senha padrão `2015`; a variável `ADMIN_PASSWORD` pode substituí-la).
+- `/administracao/apelacoes` mostra as apelações enviadas.
+- `/apelacao` permite que uma pessoa banida envie e-mail, telefone, Instagram e justificativa.
+- Banir bloqueia o acesso e torna o perfil indisponível, preservando apenas o nome. O nome fica reservado por dois anos; depois disso ele pode ser cadastrado novamente.
+- Excluir é reversível pela administração: a conta e os dados permanecem no banco para restauração.
+- Confirmações de ações são exibidas dentro do próprio site.
