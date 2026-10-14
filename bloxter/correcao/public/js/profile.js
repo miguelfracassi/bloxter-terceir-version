@@ -8,6 +8,10 @@
     try {
       ({ user } = await api(`users/${encodeURIComponent(uname)}`));
     } catch (e) {
+      if (e.code !== 'not_found') {
+        v.innerHTML = `<div class="page-head"><h1>${t('nav.profile')}</h1></div><div class="empty"><b>${esc(errMsg(e))}</b></div>`;
+        return;
+      }
       setTitle(t('profile.notfound'));
       v.innerHTML = `<div class="page-head"><h1>${t('nav.profile')}</h1></div>
         <div class="empty"><b>${t('profile.notfound')}</b>${t('profile.notfoundText')}</div>`;
