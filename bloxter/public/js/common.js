@@ -267,7 +267,7 @@
     return s;
   }
   const errMsg = (e) => {
-    const base = t(`err.${e && e.code ? e.code : 'server'}`);
+    const base = t(`err.${e && e.code ? e.code : 'server'}`) + (e && e.code === 'api_down' && e.status ? ` (HTTP ${e.status})` : '');
     return e && e.detail ? `${base} [${e.detail}]` : base;
   };
 
