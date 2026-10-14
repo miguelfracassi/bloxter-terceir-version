@@ -84,6 +84,8 @@
       'post.deleted': 'Post excluído.',
       'post.confirmDelete': 'Excluir este post?',
       follow: 'Seguir',
+      followBack: 'Seguir de volta',
+      verifiedLbl: 'Verificado',
       unfollow: 'Seguindo',
       followers: 'seguidores',
       followingLbl: 'seguindo',
@@ -194,6 +196,8 @@
       'post.deleted': 'Post deleted.',
       'post.confirmDelete': 'Delete this post?',
       follow: 'Follow',
+      followBack: 'Follow back',
+      verifiedLbl: 'Verified',
       unfollow: 'Following',
       followers: 'followers',
       followingLbl: 'following',
@@ -523,11 +527,21 @@
     } catch { /* ignore */ }
   }
 
+  const VERIFIED_SVG = '<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="currentColor" d="M22.5 12.5l-2.3-2.6.3-3.5-3.4-.8-1.8-3-3.3 1.4-3.3-1.4-1.8 3-3.4.8.3 3.5L1.5 12.5l2.3 2.6-.3 3.5 3.4.8 1.8 3 3.3-1.4 3.3 1.4 1.8-3 3.4-.8-.3-3.5z"/><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7.8 12.4l3 3 5.6-6"/></svg>';
+  function badges(u) {
+    if (!u) return '';
+    return (u.verified ? `<span class="vbadge" title="${esc(t('verifiedLbl'))}" aria-label="${esc(t('verifiedLbl'))}">${VERIFIED_SVG}</span>` : '')
+      + (u.is_ai ? '<span class="aitag" title="IA">IA</span>' : '');
+  }
+  function followLabel(u) {
+    return u.is_following ? t('unfollow') : (u.follows_me ? t('followBack') : t('follow'));
+  }
+
   function userRow(u, { compact = false } = {}) {
     return `<div class="urow">
       <a href="${accountPath(u.username)}">${avatar(u)}</a>
-      <div class="info"><a href="${accountPath(u.username)}"><b>${esc(u.name)}</b><span>@${esc(u.username)}</span></a></div>
-      ${u.is_me ? '' : `<button class="btn sm ${u.is_following ? 'ghost' : ''}" data-act="follow" data-user="${esc(u.username)}">${u.is_following ? t('unfollow') : t('follow')}</button>`}
+      <div class="info"><a href="${accountPath(u.username)}"><b>${esc(u.name)}${badges(u)}</b><span>@${esc(u.username)}</span></a></div>
+      ${u.is_me ? '' : `<button class="btn sm ${u.is_following ? 'ghost' : ''}" data-act="follow" data-user="${esc(u.username)}" data-fm="${u.follows_me ? 1 : ''}">${followLabel(u)}</button>`}
     </div>`;
   }
 
@@ -563,7 +577,7 @@
       <a href="${accountPath(p.user.username)}">${avatar(p.user)}</a>
       <div class="body">
         <div class="top">
-          <a href="${accountPath(p.user.username)}"><b>${esc(p.user.name)}</b></a>
+          <a href="${accountPath(p.user.username)}"><b>${esc(p.user.name)}</b>${badges(p.user)}</a>
           <a class="u" href="${accountPath(p.user.username)}">@${esc(p.user.username)}</a>
           <span class="t">· ${ago(p.created_at)}</span>
         </div>
@@ -637,9 +651,9 @@
     async follow(el) {
       try {
         const r = await api(`users/${encodeURIComponent(el.dataset.user)}/follow`, { method: 'POST' });
-        el.textContent = r.following ? t('unfollow') : t('follow');
+        el.textContent = r.following ? t('unfollow') : (el.dataset.fm ? t('followBack') : t('follow'));
         el.classList.toggle('ghost', r.following);
-        if (el.dataset.profile) { const c = $('#c-followers'); if (c) c.textContent = r.followers; }
+        if (el.dataset.profile) { const c = $('#c-followers'); if (c) c.textContent = Number(r.followers).toLocaleString(state.lang === 'pt' ? 'pt-BR' : 'en-US'); }
       } catch (e) { toast(errMsg(e)); }
     },
     more() { loadPosts(false); },
@@ -730,7 +744,7 @@
   window.BX = {
     $, root, esc, debounce, store, state, t, errMsg, api, toast, ICON, avatar, ago, hhmm, fmt,
     accountPath, toggles, langToggle, setTitle, go, safeNext, appShell, publicShell, refreshShellText,
-    setActiveNav, updateBadge, pollUnread, userRow, usernameChecker, postHTML, loadMoreBtn, feed,
+    setActiveNav, updateBadge, pollUnread, badges, followLabel, userRow, usernameChecker, postHTML, loadMoreBtn, feed,
     loadPosts, setFeed, forms, actions, applyLang, applyTheme, init,
   };
 
