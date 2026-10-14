@@ -90,8 +90,6 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: 'server', detail: `load: ${String(loadError.message).slice(0, 180)}` });
   }
   try {
-    await ensureSchema();
-    const sql = getSql();
     const url = new URL(req.url, 'http://localhost');
     // O vercel.json reescreve /api/qualquer/coisa para /api/index?__p=qualquer/coisa.
     // Se __p não vier (ex.: rodando local), usamos o próprio caminho da URL.
@@ -105,6 +103,10 @@ module.exports = async (req, res) => {
       .map(decodeURIComponent);
     const method = req.method;
     const [a, b, c] = parts;
+    // Diagnóstico: /api/health testa variáveis, módulos e banco de verdade.
+    if (a === 'health') return require('./health')(req, res);
+    await ensureSchema();
+    const sql = getSql();
     const me = getUserId(req);
     const q = new URLSearchParams(url.search);
     q.delete('__p');
