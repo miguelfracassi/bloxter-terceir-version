@@ -61,6 +61,39 @@ async function createAll() {
     setting_key TEXT PRIMARY KEY,
     setting_value TEXT NOT NULL
   )`;
+  // Migra instalações antigas em que site_settings usava nomes como key/value.
+  // CREATE TABLE IF NOT EXISTS não altera uma tabela já existente.
+  await s`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS setting_key TEXT`;
+  await s`ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS setting_value TEXT`;
+  await s`DO $$
+    DECLARE legacy_column TEXT;
+    BEGIN
+      FOREACH legacy_column IN ARRAY ARRAY['key', 'name', 'setting', 'setting_name'] LOOP
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = legacy_column
+        ) THEN
+          EXECUTE format(
+            'UPDATE site_settings SET setting_key = %I::text WHERE setting_key IS NULL AND %I IS NOT NULL',
+            legacy_column, legacy_column
+          );
+        END IF;
+      END LOOP;
+      FOREACH legacy_column IN ARRAY ARRAY['value', 'enabled', 'is_enabled', 'content'] LOOP
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = 'site_settings' AND column_name = legacy_column
+        ) THEN
+          EXECUTE format(
+            'UPDATE site_settings SET setting_value = %I::text WHERE setting_value IS NULL AND %I IS NOT NULL',
+            legacy_column, legacy_column
+          );
+        END IF;
+      END LOOP;
+    END $$`;
+  await s`UPDATE site_settings SET setting_key = 'legacy_' || ctid::text WHERE setting_key IS NULL`;
+  await s`UPDATE site_settings SET setting_value = 'false' WHERE setting_value IS NULL`;
+  await s`CREATE UNIQUE INDEX IF NOT EXISTS site_settings_setting_key_uidx ON site_settings (setting_key)`;
   await s`INSERT INTO site_settings (setting_key, setting_value) VALUES ('access_open', 'false') ON CONFLICT (setting_key) DO NOTHING`;
 
 }
