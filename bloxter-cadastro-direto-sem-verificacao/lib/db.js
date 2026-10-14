@@ -91,6 +91,29 @@ async function createAll() {
         END IF;
       END LOOP;
     END $$`;
+  // Tabelas antigas podem ter chave primária/colunas NOT NULL em colunas legadas (ex.: key, value).
+  // Sem isto, o INSERT de access_open falha porque essas colunas ficam nulas.
+  await s`DO $$
+    DECLARE r RECORD;
+    BEGIN
+      FOR r IN
+        SELECT c.conname FROM pg_constraint c
+        WHERE c.conrelid = 'site_settings'::regclass AND c.contype IN ('p', 'u')
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_attribute a
+            WHERE a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey) AND a.attname = 'setting_key'
+          )
+      LOOP
+        EXECUTE format('ALTER TABLE site_settings DROP CONSTRAINT %I', r.conname);
+      END LOOP;
+      FOR r IN
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'site_settings'
+          AND column_name NOT IN ('setting_key', 'setting_value') AND is_nullable = 'NO'
+      LOOP
+        EXECUTE format('ALTER TABLE site_settings ALTER COLUMN %I DROP NOT NULL', r.column_name);
+      END LOOP;
+    END $$`;
   await s`UPDATE site_settings SET setting_key = 'legacy_' || ctid::text WHERE setting_key IS NULL`;
   await s`UPDATE site_settings SET setting_value = 'false' WHERE setting_value IS NULL`;
   await s`CREATE UNIQUE INDEX IF NOT EXISTS site_settings_setting_key_uidx ON site_settings (setting_key)`;
