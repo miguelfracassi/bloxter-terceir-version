@@ -18,7 +18,7 @@
       <div class="page-head">
         <a class="icon-btn" href="/messages" aria-label="${esc(t('back'))}">${ICON.arrow}</a>
         <a href="${accountPath(other.username)}" style="display:flex;align-items:center;gap:10px">${avatar(other, 's32')}
-          <h1>${esc(other.name)}<small>@${esc(other.username)}</small></h1></a>
+          <h1>${esc(other.name)}${BX.badges(other)}<small>@${esc(other.username)}</small></h1></a>
       </div>
       <div class="thread">
         <div class="thread-body" id="tbody"></div>
