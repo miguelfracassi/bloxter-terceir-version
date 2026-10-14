@@ -1,0 +1,47 @@
+{
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__p=:path*"
+    },
+    { "source": "/administracao/apelacoes", "destination": "/administracao/apelacoes.html" },
+    { "source": "/administracao", "destination": "/administracao.html" },
+    { "source": "/apelacao", "destination": "/apelacao.html" },
+    {
+      "source": "/account",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/account/:username",
+      "destination": "/profile.html"
+    },
+    { "source": "/messages", "destination": "/messages.html" },
+    { "source": "/messages/:username", "destination": "/chat.html" },
+    { "source": "/developers-services", "destination": "/developers-services.html" },
+    { "source": "/controle-parental", "destination": "/controle-parental.html" },
+    { "source": "/support", "destination": "/support.html" },
+    { "source": "/manutencao", "destination": "/manutencao.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ]
+}
