@@ -9,15 +9,15 @@
     },
     {
       "source": "/account",
-      "destination": "/profile.html"
+      "destination": "/profile"
     },
     {
       "source": "/account/:username",
-      "destination": "/profile.html"
+      "destination": "/profile"
     },
     {
       "source": "/messages/:username",
-      "destination": "/chat.html"
+      "destination": "/chat"
     }
   ],
   "headers": [
