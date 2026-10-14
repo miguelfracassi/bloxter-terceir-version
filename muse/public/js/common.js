@@ -537,7 +537,7 @@
     } catch { /* ignore */ }
   }
 
-  const VERIFIED_SVG = '<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="currentColor" d="M22.5 12.5l-2.3-2.6.3-3.5-3.4-.8-1.8-3-3.3 1.4-3.3-1.4-1.8 3-3.4.8.3 3.5L1.5 12.5l2.3 2.6-.3 3.5 3.4.8 1.8 3 3.3-1.4 3.3 1.4 1.8-3 3.4-.8-.3-3.5z"/><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7.8 12.4l3 3 5.6-6"/></svg>';
+  const VERIFIED_SVG = '<svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true"><path fill="currentColor" d="M22.5 12.5l-2.3-2.6.3-3.5-1.8-3-1.8 3-3.4.8-.3 3.5 2.3 2.6-.3 3.5 3.4.8 1.8 3 3.3-1.4 3.3 1.4 1.8-3 3.4-.8.3-3.5-2.3-2.6z"/><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7.8 12.4l3 3 5.6-6"/></svg>';
   function badges(u) {
     if (!u) return '';
     return (u.verified ? `<span class="vbadge" title="${esc(t('verifiedLbl'))}" aria-label="${esc(t('verifiedLbl'))}">${VERIFIED_SVG}</span>` : '')
@@ -734,7 +734,14 @@
         go('/acess', true);
         return null;
       }
-    } catch { /* a falha temporária da checagem não impede a página de explicar o erro da API */ }
+    } catch {
+      // Mantém o site fechado se a consulta de acesso falhar; a página /acess
+      // não carrega este arquivo e continua disponível para reservas.
+      if (location.pathname !== '/acess') {
+        go('/acess', true);
+        return null;
+      }
+    }
     try {
       const { user } = await api('me');
       state.me = user;
