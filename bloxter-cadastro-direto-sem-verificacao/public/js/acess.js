@@ -10,7 +10,7 @@
       invalid_email:'Digite um e-mail válido.',
       email_taken:'Este e-mail já tem uma conta.',
       username_taken:'Esse nome de usuário já está ocupado ou reservado. Escolha outro.', invalid_username:'Use de 3 a 20 letras, números ou _.', name_required:'Digite seu nome.', weak_password:'A senha precisa ter pelo menos 8 caracteres.',
-      site_closed:'O site será inaugurado em 25/10 às 20:00.', server:'O servidor não conseguiu criar a conta. Confira a configuração da API e do banco de dados.', network:'Não foi possível conectar ao servidor. Confira sua conexão e tente novamente.', config_db:'Banco de dados não configurado.', config_jwt:'Sessão do servidor não configurada.'
+      site_closed:'O site será inaugurado em 25/10 às 20:00.', server:'O servidor não conseguiu criar a conta. Confira a configuração da API e do banco de dados.', network:'Não foi possível conectar ao servidor. Confira sua conexão e tente novamente.', config_db:'Banco de dados não configurado.', config_jwt:'Sessão do servidor não configurada.', db_unreachable:'Não foi possível conectar ao banco de dados. Confira a DATABASE_URL.'
     };
     return pt[code] || 'Não foi possível continuar. Tente novamente.';
   }
@@ -19,7 +19,7 @@
     try { res=await fetch(`/api/${path}`,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'}); }
     catch { const e=new Error('network');e.code='network';throw e; }
     const data=await res.json().catch(()=>({}));
-    if(!res.ok){const e=new Error(data.error||'server');e.code=data.error;e.status=res.status;throw e;} return data;
+    if(!res.ok){const e=new Error(data.error||'server');e.code=data.error;e.detail=data.detail;e.status=res.status;throw e;} return data;
   }
   async function initialize() {
     try {
@@ -35,7 +35,7 @@
       account={name,username,email,password};
       $('#credential-preview').innerHTML=`<small>SEU USUÁRIO</small><strong>@${escapeHtml(username)}</strong><small>E-MAIL</small><strong>${escapeHtml(email)}</strong><small>SENHA</small><strong>${escapeHtml(password)}</strong>`;
       show('card');
-    }catch(x){message('#account-error',errText(x.code));btn.disabled=false;}
+    }catch(x){message('#account-error',errText(x.code)+(x.code==='server'&&x.detail?' ('+x.detail+')':''));btn.disabled=false;}
   });
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   $('#download-card').addEventListener('click',()=>{
