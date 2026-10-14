@@ -1,0 +1,42 @@
+{
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__p=:path*"
+    },
+    {
+      "source": "/account",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/account/:username",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/messages/:username",
+      "destination": "/chat.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ]
+}
