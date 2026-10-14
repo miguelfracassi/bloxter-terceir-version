@@ -54,6 +54,9 @@ async function createAll() {
   )`;
   await s`CREATE INDEX IF NOT EXISTS messages_pair_idx ON messages (sender_id, receiver_id, id)`;
   await s`CREATE INDEX IF NOT EXISTS messages_recv_idx ON messages (receiver_id, read_at)`;
+  await s`ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT false`;
+  await s`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_ai BOOLEAN NOT NULL DEFAULT false`;
+  await s`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_followers BIGINT NOT NULL DEFAULT 0`;
 }
 
 // Cria as tabelas (idempotente). Várias requisições podem chegar ao mesmo tempo
