@@ -11,7 +11,7 @@
         ? conversations.map((c) => `
           <a class="conv" href="/messages/${encodeURIComponent(c.user.username)}">
             ${avatar(c.user)}
-            <div class="info"><b>${esc(c.user.name)} <span style="display:inline;font-weight:400">@${esc(c.user.username)} · ${ago(c.created_at)}</span></b>
+            <div class="info"><b>${esc(c.user.name)}${BX.badges(c.user)} <span style="display:inline;font-weight:400">@${esc(c.user.username)} · ${ago(c.created_at)}</span></b>
               <span>${c.mine ? t('msg.you') : ''}${esc(c.last)}</span></div>
             ${c.unread ? '<span class="dot"></span>' : ''}
           </a>`).join('')
