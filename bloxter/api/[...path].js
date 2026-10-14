@@ -1,6 +1,12 @@
-const bcrypt = require('bcryptjs');
-const { getSql, ensureSchema } = require('../lib/db');
-const { getUserId, setSession, clearSession } = require('../lib/auth');
+// Se algum módulo falhar ao carregar, devolvemos o erro em JSON (em vez da página de erro da Vercel).
+let bcrypt, getSql, ensureSchema, getUserId, setSession, clearSession, loadError;
+try {
+  bcrypt = require('bcryptjs');
+  ({ getSql, ensureSchema } = require('../lib/db'));
+  ({ getUserId, setSession, clearSession } = require('../lib/auth'));
+} catch (e) {
+  loadError = e;
+}
 
 // Nomes que não podem ser usados como nome de usuário.
 const RESERVED = new Set([
@@ -79,6 +85,10 @@ function isUnique(e) {
 }
 
 module.exports = async (req, res) => {
+  if (loadError) {
+    console.error(loadError);
+    return res.status(500).json({ error: 'server', detail: `load: ${String(loadError.message).slice(0, 180)}` });
+  }
   try {
     await ensureSchema();
     const sql = getSql();
